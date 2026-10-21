@@ -54,7 +54,7 @@ Time         Done  Task          Pet    Priority  Frequency
 08:40-09:25  [ ]   Grooming      Mochi  LOW       weekly
 ```
 
-## Implementation sumary
+## Implementation summary
 
 - Owner can have multiple pets
 - Pets can be of different species and can have multiple tasks
