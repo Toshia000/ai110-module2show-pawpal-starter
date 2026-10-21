@@ -1,6 +1,6 @@
-from datetime import time
+from datetime import date, time, timedelta
 
-from pawpal_system import Owner, Pet, Priority, Scheduler, Task
+from pawpal_system import Frequency, Owner, Pet, Priority, Scheduler, Task
 
 
 def test_mark_complete_changes_task_status():
@@ -63,7 +63,7 @@ def _owner_with_two_pets() -> tuple[Scheduler, Task, Task, Task]:
     mochi, luna = Pet("Mochi", "dog"), Pet("Luna", "cat")
     owner.add_pet(mochi)
     owner.add_pet(luna)
-    walk = Task("Walk", 30, Priority.HIGH)
+    walk = Task("Walk", 30, Priority.HIGH, Frequency.ONCE)  # ONCE: completing it adds no copy
     bath = Task("Bath", 20, Priority.LOW)
     feed = Task("Feeding", 10, Priority.MEDIUM)
     mochi.add_task(walk)
@@ -98,3 +98,79 @@ def test_filter_tasks_combines_filters_and_handles_no_match():
 
     assert scheduler.filter_tasks(completed=False, pet_name="Mochi") == [bath]
     assert scheduler.filter_tasks(pet_name="Rex") == []
+
+
+def test_completing_daily_task_creates_next_day_occurrence_on_same_pet():
+    pet = Pet("Mochi", "dog")
+    walk = Task("Walk", 30, Priority.HIGH, Frequency.DAILY, time=time(7, 30), due_date=date(2026, 10, 20))
+    pet.add_task(walk)
+
+    next_walk = walk.mark_complete()
+
+    assert walk.completed is True
+    assert next_walk is not walk
+    assert next_walk.completed is False
+    assert next_walk.due_date == date(2026, 10, 21)
+    assert (next_walk.name, next_walk.duration, next_walk.priority) == ("Walk", 30, Priority.HIGH)
+    assert (next_walk.frequency, next_walk.time) == (Frequency.DAILY, time(7, 30))
+    assert next_walk.pet is pet
+    assert pet.tasks == [walk, next_walk]
+
+
+def test_completing_weekly_task_creates_occurrence_seven_days_later():
+    pet = Pet("Mochi", "dog")
+    bath = Task("Bath", 20, Priority.LOW, Frequency.WEEKLY, due_date=date(2026, 10, 28))
+    pet.add_task(bath)
+
+    next_bath = bath.mark_complete()
+
+    assert next_bath.due_date == date(2026, 11, 4)  # rolls over the month boundary
+
+
+def test_completing_task_without_due_date_schedules_next_from_today():
+    task = Task("Feeding", 10, Priority.MEDIUM, Frequency.DAILY)
+
+    next_task = task.mark_complete()
+
+    assert next_task.due_date == date.today() + timedelta(days=1)
+
+
+def test_completing_one_off_task_creates_no_new_occurrence():
+    pet = Pet("Mochi", "dog")
+    vet = Task("Vet visit", 60, Priority.HIGH, Frequency.ONCE)
+    pet.add_task(vet)
+
+    assert vet.mark_complete() is None
+    assert pet.tasks == [vet]
+
+
+def test_completing_a_task_twice_does_not_create_duplicates():
+    pet = Pet("Mochi", "dog")
+    walk = Task("Walk", 30, Priority.HIGH, Frequency.DAILY)
+    pet.add_task(walk)
+
+    walk.mark_complete()
+    assert walk.mark_complete() is None
+
+    assert len(pet.tasks) == 2
+
+
+def test_task_not_on_a_pet_still_returns_next_occurrence():
+    next_task = Task("Walk", 30, Priority.HIGH, Frequency.DAILY).mark_complete()
+
+    assert next_task.pet is None
+
+
+def test_daily_schedule_excludes_tasks_due_in_the_future():
+    today = date(2026, 10, 20)
+    walk = Task("Walk", 30, Priority.HIGH, Frequency.DAILY, due_date=today)
+    overdue = Task("Meds", 5, Priority.MEDIUM, due_date=date(2026, 10, 18))
+    undated = Task("Feeding", 10, Priority.LOW)
+    scheduler = _scheduler_with(walk, overdue, undated)
+
+    next_walk = walk.mark_complete()
+    schedule = scheduler.generate_daily_schedule(today=today)
+
+    assert next_walk not in schedule
+    assert schedule == [overdue, undated]
+    assert scheduler.generate_daily_schedule(today=date(2026, 10, 21)) == [next_walk, overdue, undated]

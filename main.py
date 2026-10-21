@@ -4,7 +4,7 @@ from pawpal_system import Frequency, Owner, Pet, Priority, Scheduler, Task
 
 DAY_START = time(8, 0)
 HEADERS = ("Time", "Done", "Task", "Pet", "Priority", "Frequency")
-TASK_HEADERS = ("Time", "Done", "Task", "Pet", "Priority")
+TASK_HEADERS = ("Time", "Done", "Task", "Pet", "Priority", "Due")
 
 
 def print_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> None:
@@ -57,6 +57,7 @@ def print_tasks(title: str, tasks: list[Task]) -> None:
             task.name,
             task.pet.name if task.pet else "-",
             task.priority.name,
+            f"{task.due_date:%Y-%m-%d}" if task.due_date else "today",
         )
         for task in tasks
     ]
@@ -79,14 +80,17 @@ def main() -> None:
     luna.add_task(Task("Feeding", 10, Priority.HIGH, time=time(9, 0)))
     luna.add_task(Task("Litter box", 10, Priority.MEDIUM, time=time(12, 0)))
 
-    # Complete a couple of tasks so the completion filter has something to separate.
-    for task in owner.get_all_tasks():
-        if task.name in ("Morning walk", "Feeding"):
-            task.mark_complete()
-
     scheduler = Scheduler(owner)
-
     print_tasks("As added (no sorting)", owner.get_all_tasks())
+
+    # Completing a daily or weekly task queues its next occurrence automatically.
+    # Grooming is weekly and Morning walk and Feeding are daily; a one-off would add nothing.
+    print("\nmark_complete() on Morning walk, Feeding and Grooming")
+    for task in list(owner.get_all_tasks()):
+        if task.name in ("Morning walk", "Feeding", "Grooming"):
+            next_task = task.mark_complete()
+            print(f"{task.pet.name}'s {task.name} ({task.frequency.value}): next due {next_task.due_date}")
+    print_tasks("After completing (new copies are pending and due later)", owner.get_all_tasks())
     print_tasks("sort_by_time()", scheduler.sort_by_time())
     print_tasks("filter_tasks(completed=False)", scheduler.filter_tasks(completed=False))
     print_tasks("filter_tasks(completed=True)", scheduler.filter_tasks(completed=True))
