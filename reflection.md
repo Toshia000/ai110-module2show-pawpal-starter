@@ -3,23 +3,26 @@
 ## 1. System Design
 
 **a. Initial design**
-
+<!-- 
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
+ -->
 
 - Essential features:
   - Add a pet
   - Create a task
   - View tasks for today
-- UML design includes four classes Owner, Pet, Task and Scheduler. Owner has attributes: first and last names and a list of pets. Owner has methods to add new pets and list all tasks. Pet has attributes: name, species, owner and a list of tasks. Pet has a method to add new tasks. Task has attributes: task name, duration, priority and assigned pet. Scheduler has attribute: assigned owner. Scheduler has a method to sort tasks by priority and generate daily schedule.
+- UML design includes four classes Owner, Pet, Task and Scheduler. Owner has attributes: first and last names and a list of pets. Owner has methods to add new pets and list all tasks. Pet has attributes: name, species, owner and a list of tasks. Pet has a method to add new tasks. Task has attributes: task name, duration, priority and assigned pet. Task has a method to mark task a complete. Scheduler has attribute: assigned owner. Scheduler has a method to sort tasks by priority and generate daily schedule.
 
 **b. Design changes**
-
+<!-- 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+ -->
 
 - Scheduler does not include attribute with list of all tasks. It uses owner class to get all tasks.
 - Task includes frequency and completion status
+- Task has a method to mark task as complete
 
 ---
 

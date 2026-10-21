@@ -31,6 +31,10 @@ class Task:
     completed: bool = False
     pet: Pet | None = field(default=None, init=False, repr=False)  # set by Pet.add_task
 
+    def mark_complete(self) -> None:
+        """Mark this task as done."""
+        self.completed = True
+
 
 @dataclass(eq=False)
 class Pet:
