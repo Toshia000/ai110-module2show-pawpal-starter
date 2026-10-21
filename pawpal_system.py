@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
 
@@ -29,6 +30,7 @@ class Task:
     priority: Priority
     frequency: Frequency = Frequency.DAILY
     completed: bool = False
+    time: datetime.time | None = None  # scheduled time of day; None means unscheduled
     pet: Pet | None = field(default=None, init=False, repr=False)  # set by Pet.add_task
 
     def mark_complete(self) -> None:
@@ -79,6 +81,16 @@ class Scheduler:
     def sort_by_priority(self) -> list[Task]:
         """Return the owner's tasks ordered from most to least important."""
         return sorted(self.owner.get_all_tasks(), key=lambda task: task.priority)
+
+    def sort_by_time(self) -> list[Task]:
+        """Return the owner's tasks ordered earliest first; tasks without a time go last.
+
+        Ties are broken by priority, then by insertion order (sorted is stable).
+        """
+        return sorted(
+            self.owner.get_all_tasks(),
+            key=lambda task: (task.time is None, task.time or datetime.time.min, task.priority),
+        )
 
     def generate_daily_schedule(self) -> list[Task]:
         """Build the day's ordered task list: pending tasks, most important first."""
