@@ -43,14 +43,21 @@
 ## 3. AI Collaboration
 
 **a. How you used AI**
-
+<!-- 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
 - What kinds of prompts or questions were most helpful?
+ -->
+
+- I did use AI by giving it specific instructions and verifying suggested changes
+- I used AI to create uml system diagram, implement classes from the diagram and create tests
 
 **b. Judgment and verification**
-
+<!-- 
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
+ -->
+
+- I asked AI to create demo script and to output schedule to the terminal. Schedule created by AI did not have headers, so I asked to generate headers for attributes in schedule
 
 ---
 
