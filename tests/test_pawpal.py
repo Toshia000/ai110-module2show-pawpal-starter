@@ -174,3 +174,95 @@ def test_daily_schedule_excludes_tasks_due_in_the_future():
     assert next_walk not in schedule
     assert schedule == [overdue, undated]
     assert scheduler.generate_daily_schedule(today=date(2026, 10, 21)) == [next_walk, overdue, undated]
+
+
+def test_find_conflicts_flags_same_start_time_for_different_pets():
+    owner = Owner("Jordan", "Lee")
+    mochi, luna = Pet("Mochi", "dog"), Pet("Luna", "cat")
+    owner.add_pet(mochi)
+    owner.add_pet(luna)
+    walk = Task("Walk", 30, Priority.HIGH, time=time(9, 0))
+    feed = Task("Feeding", 10, Priority.MEDIUM, time=time(9, 0))
+    mochi.add_task(walk)
+    luna.add_task(feed)
+
+    assert Scheduler(owner).find_conflicts() == [(walk, feed)]
+
+
+def test_find_conflicts_flags_overlap_for_the_same_pet():
+    walk = Task("Walk", 30, Priority.HIGH, time=time(9, 0))
+    bath = Task("Bath", 20, Priority.LOW, time=time(9, 15))
+
+    assert _scheduler_with(bath, walk).find_conflicts() == [(walk, bath)]
+
+
+def test_find_conflicts_ignores_back_to_back_tasks():
+    walk = Task("Walk", 30, Priority.HIGH, time=time(9, 0))
+    feed = Task("Feeding", 10, Priority.MEDIUM, time=time(9, 30))
+
+    assert _scheduler_with(walk, feed).find_conflicts() == []
+
+
+def test_find_conflicts_ignores_completed_and_untimed_tasks():
+    walk = Task("Walk", 30, Priority.HIGH, time=time(9, 0))
+    done = Task("Feeding", 10, Priority.MEDIUM, Frequency.ONCE, time=time(9, 0))
+    untimed = Task("Grooming", 45, Priority.LOW)
+    done.mark_complete()
+
+    assert _scheduler_with(walk, done, untimed).find_conflicts() == []
+
+
+def test_find_conflicts_catches_a_long_task_spanning_several_later_ones():
+    long_task = Task("Training", 120, Priority.HIGH, time=time(9, 0))
+    early = Task("Feeding", 10, Priority.MEDIUM, time=time(9, 30))
+    late = Task("Meds", 5, Priority.LOW, time=time(10, 30))
+    after = Task("Play", 15, Priority.LOW, time=time(11, 0))
+
+    conflicts = _scheduler_with(after, late, early, long_task).find_conflicts()
+
+    assert conflicts == [(long_task, early), (long_task, late)]
+
+
+def test_find_conflicts_ignores_same_time_on_different_days():
+    today = date(2026, 10, 20)
+    walk = Task("Walk", 30, Priority.HIGH, time=time(9, 0), due_date=today)
+    tomorrows_walk = walk.mark_complete()
+
+    assert _scheduler_with(walk, tomorrows_walk).find_conflicts(today=today) == []
+    # An undated task counts as due today, so it does clash with a dated task on that day.
+    undated = Task("Feeding", 10, Priority.LOW, time=time(9, 0))
+    dated = Task("Meds", 5, Priority.LOW, time=time(9, 5), due_date=today)
+    assert _scheduler_with(undated, dated).find_conflicts(today=today) == [(undated, dated)]
+
+
+def test_find_conflicts_catches_a_task_running_past_midnight():
+    today = date(2026, 10, 20)
+    late = Task("Vigil", 90, Priority.HIGH, time=time(23, 30), due_date=today)
+    early = Task("Meds", 5, Priority.LOW, time=time(0, 30), due_date=date(2026, 10, 21))
+
+    assert _scheduler_with(late, early).find_conflicts() == [(late, early)]
+
+
+def test_conflict_warnings_describe_each_overlap_without_raising():
+    owner = Owner("Jordan", "Lee")
+    mochi, luna = Pet("Mochi", "dog"), Pet("Luna", "cat")
+    owner.add_pet(mochi)
+    owner.add_pet(luna)
+    mochi.add_task(Task("Walk", 30, Priority.HIGH, time=time(9, 0)))
+    luna.add_task(Task("Feeding", 10, Priority.MEDIUM, time=time(9, 5)))
+    mochi.add_task(Task("Bath", 20, Priority.LOW, time=time(9, 20)))
+
+    warnings = Scheduler(owner).conflict_warnings()
+
+    assert warnings == [
+        "Warning (different pets): Mochi's Walk (09:00-09:30) overlaps Luna's Feeding (09:05-09:15)",
+        "Warning (same pet): Mochi's Walk (09:00-09:30) overlaps Mochi's Bath (09:20-09:40)",
+    ]
+
+
+def test_conflict_warnings_is_empty_when_nothing_overlaps():
+    walk = Task("Walk", 30, Priority.HIGH, time=time(9, 0))
+    feed = Task("Feeding", 10, Priority.MEDIUM, time=time(10, 0))
+
+    assert _scheduler_with(walk, feed).conflict_warnings() == []
+    assert Scheduler(Owner("Jordan", "Lee")).conflict_warnings() == []

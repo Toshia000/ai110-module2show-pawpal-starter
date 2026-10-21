@@ -104,6 +104,13 @@ class Owner:
         return [task for pet in self.pets for task in pet.tasks]
 
 
+def _describe(task: Task) -> str:
+    """Return e.g. "Mochi's Walk (09:00-09:30)" for a timed task that belongs to a pet."""
+    start = datetime.datetime.combine(datetime.date.min, task.time)
+    end = start + datetime.timedelta(minutes=task.duration)
+    return f"{task.pet.name}'s {task.name} ({start:%H:%M}-{end:%H:%M})"
+
+
 class Scheduler:
     def __init__(self, owner: Owner) -> None:
         """Create a scheduler that plans tasks for the given owner."""
@@ -136,6 +143,43 @@ class Scheduler:
             for task in self.owner.get_all_tasks()
             if (completed is None or task.completed == completed)
             and (wanted_pet is None or (task.pet and task.pet.name.casefold() == wanted_pet))
+        ]
+
+    def find_conflicts(self, today: datetime.date | None = None) -> list[tuple[Task, Task]]:
+        """Return pairs of pending timed tasks whose time ranges overlap, for any pets.
+
+        A task occupies [start, start + duration) on its due date (today if it has none), so
+        back-to-back tasks do not conflict and tasks on different days never do. Completed and
+        untimed tasks are ignored. Each pair is ordered earliest first, ties by priority.
+        """
+        today = today or datetime.date.today()
+        occupied = sorted(
+            (
+                (start, start + datetime.timedelta(minutes=task.duration), task)
+                for task in self.owner.get_all_tasks()
+                if task.time and not task.completed
+                for start in [datetime.datetime.combine(task.due_date or today, task.time)]
+            ),
+            key=lambda slot: (slot[0], slot[2].priority),
+        )
+        conflicts = []
+        for i, (_, first_end, first) in enumerate(occupied):
+            for second_start, _, second in occupied[i + 1 :]:
+                if second_start >= first_end:
+                    break  # sorted by start, so nothing later can overlap `first` either
+                conflicts.append((first, second))
+        return conflicts
+
+    def conflict_warnings(self, today: datetime.date | None = None) -> list[str]:
+        """Return one human-readable warning per overlapping pair; empty when all is clear.
+
+        Lightweight by design: it only reports. Nothing is raised or blocked, so the caller
+        can show the messages and carry on with the schedule as is.
+        """
+        return [
+            f"Warning ({'same pet' if first.pet is second.pet else 'different pets'}): "
+            f"{_describe(first)} overlaps {_describe(second)}"
+            for first, second in self.find_conflicts(today)
         ]
 
     def generate_daily_schedule(self, today: datetime.date | None = None) -> list[Task]:

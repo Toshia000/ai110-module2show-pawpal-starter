@@ -64,6 +64,12 @@ def print_tasks(title: str, tasks: list[Task]) -> None:
     print_table(TASK_HEADERS, rows)
 
 
+def print_warnings(title: str, warnings: list[str]) -> None:
+    """Print each warning on its own line, or a note that there are none."""
+    print(f"\n{title}")
+    print("\n".join(warnings) if warnings else "No conflicts.")
+
+
 def main() -> None:
     owner = Owner("Jordan", "Lee")
     mochi = Pet("Mochi", "dog")
@@ -75,13 +81,25 @@ def main() -> None:
     # Two tasks share 09:00 (tie broken by priority) and one has no time (sorts last).
     mochi.add_task(Task("Evening walk", 30, Priority.MEDIUM, time=time(18, 30)))
     mochi.add_task(Task("Grooming", 45, Priority.LOW, Frequency.WEEKLY))
-    luna.add_task(Task("Play session", 15, Priority.LOW, time=time(9, 0)))
+    mochi.add_task(Task("Play session", 15, Priority.LOW, time=time(9, 0)))
     mochi.add_task(Task("Morning walk", 30, Priority.HIGH, time=time(7, 30)))
     luna.add_task(Task("Feeding", 10, Priority.HIGH, time=time(9, 0)))
     luna.add_task(Task("Litter box", 10, Priority.MEDIUM, time=time(12, 0)))
+    # Overlaps Mochi's own Evening walk (18:30-19:00), so it conflicts within one pet.
+    mochi.add_task(Task("Vet call", 15, Priority.HIGH, time=time(18, 45)))
+    # Two tasks at exactly the same time, one per pet, to trigger a conflict warning.
+    mochi.add_task(Task("Medication", 10, Priority.HIGH, time=time(14, 0)))
+    luna.add_task(Task("Insulin shot", 10, Priority.HIGH, time=time(14, 0)))
 
     scheduler = Scheduler(owner)
     print_tasks("As added (no sorting)", owner.get_all_tasks())
+    warnings = scheduler.conflict_warnings()
+    print_warnings("conflict_warnings()", warnings)
+    detected = any("Medication" in w and "Insulin shot" in w for w in warnings)
+    print(
+        "\nCheck: same-time Medication/Insulin shot pair "
+        + ("detected." if detected else "NOT detected - conflict detection is broken!")
+    )
 
     # Completing a daily or weekly task queues its next occurrence automatically.
     # Grooming is weekly and Morning walk and Feeding are daily; a one-off would add nothing.
