@@ -74,7 +74,17 @@ pytest --cov
 Sample test output:
 
 ```
-# Paste your pytest output here
+============================================================================== test session starts ===============================================================================
+platform win32 -- Python 3.13.1, pytest-9.1.1, pluggy-1.7.0
+rootdir: C:\Samuel\CodePath\AI110_Foundations_of_AI_Engineering\Project_2_PawPal+
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.15.1
+collected 47 items                                                                                                                                                                
+
+tests\test_pawpal.py ...............................................                                                                                                        [100%]
+
+=============================================================================== 47 passed in 0.08s ===============================================================================
 ```
 
 ## 📐 Smarter Scheduling
