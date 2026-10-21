@@ -104,12 +104,49 @@ Warning (same pet): Mochi's Evening walk (18:30-19:00) overlaps Mochi's Vet call
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+The demo has two parts. The Streamlit app covers the basic flow (owners, pets, tasks, a daily plan). The terminal script `main.py` shows the smarter scheduling features, which the UI does not expose yet.
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+### Part 1: Streamlit app
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+```bash
+streamlit run app.py
+```
+
+1. **Enter the owner.** Under *Owner and Pets*, the name fields start as "Jordan Lee". Edit them if you like.
+2. **Add pets.** Type a pet name, choose a species (dog, cat or other) and click **Add pet**. Each pet appears in the *Current pets* table. Add a second pet, such as a cat named Luna, to see tasks from several pets planned together.
+3. **Add tasks.** Under *Tasks*, pick a pet, then enter a title, a duration in minutes and a priority (High, Medium or Low), and click **Add task**. Add a few with mixed priorities. The *Current tasks* table lists them in the order you added them.
+4. **Generate the schedule.** Under *Build Schedule*, click **Generate schedule**. The pending tasks of all pets appear back to back from 08:00, most important first. A High task added last still lands at the top. Tasks of equal priority keep the order you added them in.
+
+### Part 2: Sorting, conflicts and recurring tasks
+
+```bash
+python main.py
+```
+
+The script builds Jordan Lee's two pets and nine tasks, added out of time order on purpose, then prints each feature in turn:
+
+1. **As added.** The tasks print in insertion order, with `--:--` for tasks that have no time.
+2. **Conflict warnings.** `conflict_warnings()` reports three overlaps without stopping anything. One is a same-time pair across pets, one is a partial overlap on a single pet, and one is a 09:00 tie:
+
+   ```
+   Warning (different pets): Mochi's Medication (14:00-14:10) overlaps Luna's Insulin shot (14:00-14:10)
+   Warning (same pet): Mochi's Evening walk (18:30-19:00) overlaps Mochi's Vet call (18:45-19:00)
+   ```
+
+3. **Recurring tasks.** It completes the daily Morning walk and Feeding and the weekly Grooming. Each completed task is marked `[x]`, and a new pending copy appears with the next due date (1 day later for daily, 7 days for weekly):
+
+   ```
+   Mochi's Grooming (weekly): next due 2026-10-27
+   Mochi's Morning walk (daily): next due 2026-10-21
+   Luna's Feeding (daily): next due 2026-10-21
+   ```
+
+4. **Sorting by time.** `sort_by_time()` lists tasks earliest first. Ties at the same time go to the higher priority, and untimed tasks come last.
+5. **Filtering.** `filter_tasks()` runs with `completed=False`, `completed=True`, `pet_name="luna"` (case-insensitive), both filters together, and an unknown pet, which returns no matches.
+6. **Today's schedule.** `generate_daily_schedule()` prints only pending tasks due today or earlier, highest priority first. Tomorrow's copies and the tasks just completed are left out.
+
+The dates in the output follow the day you run it.
+
+<!-- 
+**Screenshot or video** *(optional)*: Insert a screenshot or link to a demo video here
+ -->
