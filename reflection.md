@@ -19,6 +19,7 @@
 - If yes, describe at least one change and why you made it.
 
 - Scheduler does not include attribute with list of all tasks. It uses owner class to get all tasks.
+- Task includes frequency and completion status
 
 ---
 

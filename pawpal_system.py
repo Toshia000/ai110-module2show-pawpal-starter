@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 
 class Priority(IntEnum):
@@ -12,6 +12,14 @@ class Priority(IntEnum):
     LOW = 3
 
 
+class Frequency(Enum):
+    """How often a task recurs."""
+
+    ONCE = "once"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+
+
 # eq=False: entities compare and hash by identity, so two identical-looking tasks stay distinct.
 # Back-references and child lists are init=False and filled via add_pet/add_task to stay in sync.
 @dataclass(eq=False)
@@ -19,6 +27,8 @@ class Task:
     name: str
     duration: int  # minutes
     priority: Priority
+    frequency: Frequency = Frequency.DAILY
+    completed: bool = False
     pet: Pet | None = field(default=None, init=False, repr=False)  # set by Pet.add_task
 
 

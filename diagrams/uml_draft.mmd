@@ -19,6 +19,8 @@ classDiagram
         +String name
         +int duration
         +Priority priority
+        +Frequency frequency
+        +bool completed
         +Pet pet
     }
 
@@ -27,6 +29,13 @@ classDiagram
         HIGH
         MEDIUM
         LOW
+    }
+
+    class Frequency {
+        <<enumeration>>
+        ONCE
+        DAILY
+        WEEKLY
     }
 
     class Scheduler {
@@ -40,3 +49,4 @@ classDiagram
     Scheduler "1" --> "1" Owner : plans for
     Scheduler ..> Task : orders
     Task --> Priority : has
+    Task --> Frequency : repeats
