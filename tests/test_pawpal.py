@@ -1,5 +1,7 @@
 from datetime import date, time, timedelta
 
+import pytest
+
 from pawpal_system import Frequency, Owner, Pet, Priority, Scheduler, Task
 
 
@@ -266,3 +268,177 @@ def test_conflict_warnings_is_empty_when_nothing_overlaps():
 
     assert _scheduler_with(walk, feed).conflict_warnings() == []
     assert Scheduler(Owner("Jordan", "Lee")).conflict_warnings() == []
+
+
+# --- Sorting correctness -----------------------------------------------------------------
+
+
+def test_sort_by_priority_puts_high_first_and_keeps_insertion_order_on_ties():
+    low = Task("Play", 15, Priority.LOW)
+    first_high = Task("Meds", 5, Priority.HIGH)
+    medium = Task("Feeding", 10, Priority.MEDIUM)
+    second_high = Task("Walk", 30, Priority.HIGH)
+
+    result = _scheduler_with(low, first_high, medium, second_high).sort_by_priority()
+
+    assert result == [first_high, second_high, medium, low]
+
+
+def test_sort_by_time_orders_untimed_tasks_by_priority_among_themselves():
+    low = Task("Play", 15, Priority.LOW)
+    high = Task("Grooming", 45, Priority.HIGH)
+    timed = Task("Walk", 30, Priority.LOW, time=time(8, 0))
+
+    assert _scheduler_with(low, high, timed).sort_by_time() == [timed, high, low]
+
+
+def test_sort_by_time_keeps_insertion_order_when_time_and_priority_tie():
+    first = Task("Walk", 30, Priority.MEDIUM, time=time(9, 0))
+    second = Task("Feeding", 10, Priority.MEDIUM, time=time(9, 0))
+
+    assert _scheduler_with(first, second).sort_by_time() == [first, second]
+
+
+def test_sort_by_time_compares_time_of_day_only_not_due_date():
+    tomorrow_early = Task("Walk", 30, Priority.LOW, time=time(8, 0), due_date=date(2026, 10, 21))
+    today_late = Task("Meds", 5, Priority.HIGH, time=time(9, 0), due_date=date(2026, 10, 20))
+
+    assert _scheduler_with(today_late, tomorrow_early).sort_by_time() == [tomorrow_early, today_late]
+
+
+def test_sort_by_time_includes_completed_tasks():
+    done = Task("Walk", 30, Priority.HIGH, Frequency.ONCE, time=time(7, 0))
+    pending = Task("Feeding", 10, Priority.HIGH, time=time(8, 0))
+    done.mark_complete()
+
+    assert _scheduler_with(pending, done).sort_by_time() == [done, pending]
+
+
+def test_sorting_returns_a_new_list_and_leaves_pet_tasks_untouched():
+    evening = Task("Dinner", 10, Priority.HIGH, time=time(18, 0))
+    morning = Task("Walk", 30, Priority.LOW, time=time(7, 30))
+    scheduler = _scheduler_with(evening, morning)
+
+    by_time = scheduler.sort_by_time()
+    by_time.clear()
+
+    assert scheduler.owner.pets[0].tasks == [evening, morning]
+
+
+def test_sorting_and_filtering_an_owner_with_no_tasks_returns_empty_lists():
+    pet_without_tasks = Owner("Jordan", "Lee")
+    pet_without_tasks.add_pet(Pet("Mochi", "dog"))
+
+    for owner in (Owner("Sam", "Kim"), pet_without_tasks):
+        scheduler = Scheduler(owner)
+        assert scheduler.sort_by_priority() == []
+        assert scheduler.sort_by_time() == []
+        assert scheduler.generate_daily_schedule() == []
+
+
+# --- Recurrence logic --------------------------------------------------------------------
+
+
+def test_task_defaults_to_daily_so_it_recurs_unless_marked_once():
+    assert Task("Walk", 30, Priority.HIGH).frequency is Frequency.DAILY
+
+
+def test_late_completion_keeps_cadence_and_the_copy_is_overdue_but_still_scheduled():
+    today = date(2026, 10, 20)
+    pet = Pet("Mochi", "dog")
+    walk = Task("Walk", 30, Priority.HIGH, Frequency.DAILY, due_date=date(2026, 10, 15))
+    pet.add_task(walk)
+    owner = Owner("Jordan", "Lee")
+    owner.add_pet(pet)
+
+    next_walk = walk.mark_complete()
+
+    assert next_walk.due_date == date(2026, 10, 16)  # old due date + 1, not today + 1
+    assert next_walk.due_date < today
+    assert Scheduler(owner).generate_daily_schedule(today=today) == [next_walk]
+
+
+def test_completing_each_copy_builds_a_chain_of_consecutive_due_dates():
+    pet = Pet("Mochi", "dog")
+    task = Task("Walk", 30, Priority.HIGH, Frequency.DAILY, due_date=date(2026, 10, 20))
+    pet.add_task(task)
+
+    chain = [task]
+    for _ in range(3):
+        chain.append(chain[-1].mark_complete())
+
+    assert [t.due_date for t in chain] == [date(2026, 10, d) for d in (20, 21, 22, 23)]
+    assert [t.completed for t in chain] == [True, True, True, False]
+    assert pet.tasks == chain
+
+
+@pytest.mark.parametrize(
+    ("frequency", "due", "expected"),
+    [
+        (Frequency.DAILY, date(2026, 12, 31), date(2027, 1, 1)),  # year end
+        (Frequency.DAILY, date(2026, 10, 31), date(2026, 11, 1)),  # month end
+        (Frequency.DAILY, date(2028, 2, 28), date(2028, 2, 29)),  # leap day exists
+        (Frequency.DAILY, date(2026, 2, 28), date(2026, 3, 1)),  # leap day does not
+        (Frequency.WEEKLY, date(2026, 12, 28), date(2027, 1, 4)),  # year end
+        (Frequency.WEEKLY, date(2028, 2, 22), date(2028, 2, 29)),  # lands on leap day
+    ],
+)
+def test_next_occurrence_rolls_over_calendar_boundaries(frequency, due, expected):
+    task = Task("Walk", 30, Priority.HIGH, frequency, due_date=due)
+
+    assert task.mark_complete().due_date == expected
+
+
+def test_completing_the_next_copy_does_not_touch_the_original():
+    pet = Pet("Mochi", "dog")
+    first = Task("Walk", 30, Priority.HIGH, due_date=date(2026, 10, 20))
+    pet.add_task(first)
+    second = first.mark_complete()
+
+    second.mark_complete()
+
+    assert first.completed is True
+    assert first.due_date == date(2026, 10, 20)
+    assert len(pet.tasks) == 3
+
+
+# --- Conflict detection ------------------------------------------------------------------
+
+
+def test_find_conflicts_with_no_tasks_returns_empty_list():
+    assert Scheduler(Owner("Jordan", "Lee")).find_conflicts() == []
+
+
+def test_find_conflicts_reports_every_pair_in_a_three_way_overlap():
+    outer = Task("Training", 60, Priority.HIGH, time=time(9, 0))
+    middle = Task("Bath", 40, Priority.MEDIUM, time=time(9, 10))
+    inner = Task("Feeding", 20, Priority.LOW, time=time(9, 20))
+
+    conflicts = _scheduler_with(inner, outer, middle).find_conflicts()
+
+    assert conflicts == [(outer, middle), (outer, inner), (middle, inner)]
+
+
+def test_find_conflicts_orders_same_start_pair_by_priority_regardless_of_insertion():
+    low = Task("Play", 15, Priority.LOW, time=time(9, 0))
+    high = Task("Feeding", 10, Priority.HIGH, time=time(9, 0))
+
+    assert _scheduler_with(low, high).find_conflicts() == [(high, low)]
+
+
+def test_find_conflicts_does_not_flag_a_midnight_task_on_the_same_morning_it_started():
+    late = Task("Vigil", 90, Priority.HIGH, time=time(23, 30), due_date=date(2026, 10, 20))
+    same_day_early = Task("Meds", 5, Priority.LOW, time=time(0, 30), due_date=date(2026, 10, 20))
+
+    assert _scheduler_with(late, same_day_early).find_conflicts() == []
+
+
+def test_find_conflicts_only_reports_pending_tasks_after_one_overlapping_task_is_completed():
+    walk = Task("Walk", 30, Priority.HIGH, Frequency.ONCE, time=time(9, 0))
+    bath = Task("Bath", 20, Priority.LOW, time=time(9, 15))
+    scheduler = _scheduler_with(walk, bath)
+    assert scheduler.find_conflicts() == [(walk, bath)]
+
+    walk.mark_complete()
+
+    assert scheduler.find_conflicts() == []
