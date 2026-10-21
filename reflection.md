@@ -7,6 +7,11 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+- Essential features:
+  - Add a pet
+  - Create a task
+  - View tasks for today
+
 **b. Design changes**
 
 - Did your design change during implementation?
