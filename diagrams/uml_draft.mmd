@@ -1,0 +1,41 @@
+classDiagram
+    class Owner {
+        +String firstName
+        +String lastName
+        +List~Pet~ pets
+        +addPet(pet Pet) void
+    }
+
+    class Pet {
+        +String name
+        +String species
+        +Owner owner
+        +List~Task~ tasks
+        +addTask(task Task) void
+    }
+
+    class Task {
+        +String name
+        +int duration
+        +Priority priority
+        +Pet pet
+    }
+
+    class Priority {
+        <<enumeration>>
+        HIGH
+        MEDIUM
+        LOW
+    }
+
+    class Scheduler {
+        +List~Task~ tasks
+        +addTask(task Task) void
+        +sortByPriority() List~Task~
+        +generateDailySchedule() List~Task~
+    }
+
+    Owner "1" --> "1..*" Pet : owns
+    Pet "1" --> "0..*" Task : has
+    Scheduler "1" o-- "0..*" Task : schedules
+    Task --> Priority : has
