@@ -73,6 +73,7 @@ class Owner:
 
 class Scheduler:
     def __init__(self, owner: Owner) -> None:
+        """Create a scheduler that plans tasks for the given owner."""
         self.owner = owner
 
     def sort_by_priority(self) -> list[Task]:
