@@ -73,8 +73,8 @@ class Scheduler:
 
     def sort_by_priority(self) -> list[Task]:
         """Return the owner's tasks ordered from most to least important."""
-        pass
+        return sorted(self.owner.get_all_tasks(), key=lambda task: task.priority)
 
     def generate_daily_schedule(self) -> list[Task]:
-        """Build the day's ordered task list."""
-        pass
+        """Build the day's ordered task list: pending tasks, most important first."""
+        return [task for task in self.sort_by_priority() if not task.completed]
