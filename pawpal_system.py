@@ -48,6 +48,12 @@ class Task:
         after this task's due date, added to the same pet. Returns it, or None when no
         occurrence was created: a one-off task, or a task that was already complete, so that
         completing twice cannot spawn duplicates.
+
+        The next due date is the old due date plus the interval from RECURRENCE_INTERVALS
+        (today stands in when due_date is None), so a task finished late keeps its cadence and
+        the copy can already be overdue. The copy is not marked complete, and a task not
+        attached to a pet yields an unattached copy. O(1) apart from the list scan in
+        Pet.add_task.
         """
         if self.completed:
             return None
@@ -105,7 +111,11 @@ class Owner:
 
 
 def _describe(task: Task) -> str:
-    """Return e.g. "Mochi's Walk (09:00-09:30)" for a timed task that belongs to a pet."""
+    """Return e.g. "Mochi's Walk (09:00-09:30)" for a timed task that belongs to a pet.
+
+    The end time is start plus duration, so a task running past midnight shows the wrapped
+    clock time (23:30 + 90 min reads "23:30-01:00"). Requires task.time and task.pet to be set.
+    """
     start = datetime.datetime.combine(datetime.date.min, task.time)
     end = start + datetime.timedelta(minutes=task.duration)
     return f"{task.pet.name}'s {task.name} ({start:%H:%M}-{end:%H:%M})"
@@ -123,7 +133,11 @@ class Scheduler:
     def sort_by_time(self) -> list[Task]:
         """Return the owner's tasks ordered earliest first; tasks without a time go last.
 
-        Ties are broken by priority, then by insertion order (sorted is stable).
+        Sorts on the key (has no time, time of day, priority): the leading flag pushes untimed
+        tasks to the end, where they are ordered among themselves by priority. Ties are then
+        broken by insertion order (sorted is stable). Only the time of day is compared, not
+        due_date, so a task due tomorrow at 08:00 still sorts before one due today at 09:00.
+        Completed tasks are included. Runs in O(n log n) and returns a new list.
         """
         return sorted(
             self.owner.get_all_tasks(),
@@ -135,7 +149,11 @@ class Scheduler:
     ) -> list[Task]:
         """Return the owner's tasks matching every given filter; None skips that filter.
 
-        pet_name is matched case-insensitively against the pet's full name.
+        completed=True keeps only finished tasks and completed=False only pending ones. pet_name
+        is matched case-insensitively and ignoring surrounding spaces against the pet's full
+        name, never as a substring, so an unknown name returns []. The filters combine with AND,
+        and with neither given every task is returned. One O(n) pass that keeps the owner's
+        pet-then-insertion order.
         """
         wanted_pet = pet_name.strip().casefold() if pet_name is not None else None
         return [
@@ -151,6 +169,17 @@ class Scheduler:
         A task occupies [start, start + duration) on its due date (today if it has none), so
         back-to-back tasks do not conflict and tasks on different days never do. Completed and
         untimed tasks are ignored. Each pair is ordered earliest first, ties by priority.
+
+        Sweep-line approach: build each task's (start, end) as full datetimes, sort by start,
+        then compare each task only with the tasks that start before it ends. Because the list
+        is sorted, the inner loop stops at the first task starting at or after that end, so
+        nothing later can overlap either. A long task is compared with every task it covers,
+        not just its neighbour. Using datetimes also handles tasks that run past midnight.
+        Costs O(n log n) for the sort plus O(n + k) for the sweep, where k is the number of
+        overlapping pairs returned (k can approach n squared when everything overlaps).
+
+        Args:
+            today: the date used for tasks with no due_date; defaults to date.today().
         """
         today = today or datetime.date.today()
         occupied = sorted(
@@ -174,7 +203,13 @@ class Scheduler:
         """Return one human-readable warning per overlapping pair; empty when all is clear.
 
         Lightweight by design: it only reports. Nothing is raised or blocked, so the caller
-        can show the messages and carry on with the schedule as is.
+        can show the messages and carry on with the schedule as is. It formats the pairs from
+        find_conflicts (same detection rules and cost), labelling each one "same pet" or
+        "different pets", e.g. "Warning (same pet): Mochi's Walk (09:00-09:30) overlaps
+        Mochi's Bath (09:15-09:35)".
+
+        Args:
+            today: the date used for tasks with no due_date; defaults to date.today().
         """
         return [
             f"Warning ({'same pet' if first.pet is second.pet else 'different pets'}): "
@@ -186,6 +221,12 @@ class Scheduler:
         """Build the day's ordered task list: pending tasks due by today, most important first.
 
         Tasks due on a later date, such as tomorrow's copy of a daily task, are left out.
+        Tasks with no due_date count as due today, and overdue ones stay in. Order comes only
+        from sort_by_priority, so task.time is not used. Filters the priority-sorted list in
+        one pass, so it runs in O(n log n).
+
+        Args:
+            today: the cutoff date; defaults to date.today().
         """
         today = today or datetime.date.today()
         return [

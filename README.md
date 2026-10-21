@@ -79,14 +79,28 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
+The `Scheduler` in `pawpal_system.py` goes beyond a simple task list. Run `python main.py` to see each feature in the terminal.
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `sort_by_priority()`, `sort_by_time()` | Priority puts HIGH first. Time sorts earliest first, with untimed tasks last and ties broken by priority. Both are O(n log n). |
+| Filtering | `filter_tasks(completed, pet_name)`, `generate_daily_schedule()` | Filter by completion status and/or pet name (case-insensitive); the two combine with AND. The daily schedule keeps only pending tasks due today or earlier. |
+| Conflict handling | `find_conflicts()`, `conflict_warnings()` | Detects overlapping time ranges (start plus duration), not just identical start times, for the same pet or different pets. Back-to-back tasks are fine. Returns warning messages instead of raising, so the app keeps running. |
+| Recurring tasks | `Task.mark_complete()` | Completing a `daily` or `weekly` task creates the next occurrence on the same pet, due 1 or 7 days after the original. One-off (`once`) tasks and repeat completions create nothing. |
+
+Example conflict warnings:
+
+```
+Warning (different pets): Mochi's Medication (14:00-14:10) overlaps Luna's Insulin shot (14:00-14:10)
+Warning (same pet): Mochi's Evening walk (18:30-19:00) overlaps Mochi's Vet call (18:45-19:00)
+```
+
+### Design tradeoffs
+
+- **Conflicts only warn.** Nothing blocks adding a task, and the owner is assumed to do one thing at a time, so tasks for different pets can conflict too.
+- **Only timed, pending tasks are checked.** Completed tasks, untimed tasks and tasks on different days are ignored.
+- **The daily schedule ranks by priority only.** It does not yet use `task.time`, and there is no daily time budget, so it never drops tasks.
+- **Recurrence counts from the due date.** A task finished late keeps its cadence, so its next copy can already be overdue. Completed copies accumulate in the task list.
 
 ## 📸 Demo Walkthrough
 
