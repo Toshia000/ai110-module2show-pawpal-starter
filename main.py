@@ -4,6 +4,20 @@ from pawpal_system import Frequency, Owner, Pet, Priority, Scheduler, Task
 
 DAY_START = time(8, 0)
 HEADERS = ("Time", "Done", "Task", "Pet", "Priority", "Frequency")
+TASK_HEADERS = ("Time", "Done", "Task", "Pet", "Priority")
+
+
+def print_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> None:
+    """Print rows as a left-aligned table with a header and a dashed separator."""
+    widths = [max(len(cell) for cell in column) for column in zip(headers, *rows)]
+
+    def format_row(cells: tuple[str, ...]) -> str:
+        return "  ".join(cell.ljust(width) for cell, width in zip(cells, widths)).rstrip()
+
+    print(format_row(headers))
+    print(format_row(tuple("-" * width for width in widths)))
+    for row in rows:
+        print(format_row(row))
 
 
 def print_schedule(owner: Owner, tasks: list[Task]) -> None:
@@ -25,17 +39,28 @@ def print_schedule(owner: Owner, tasks: list[Task]) -> None:
         )
         start = end
 
-    widths = [max(len(cell) for cell in column) for column in zip(HEADERS, *rows)]
-
-    def format_row(cells: tuple[str, ...]) -> str:
-        return "  ".join(cell.ljust(width) for cell, width in zip(cells, widths)).rstrip()
-
     print(f"Today's Schedule for {owner.first_name} {owner.last_name} - {today:%A, %B %d, %Y}")
     print()
-    print(format_row(HEADERS))
-    print(format_row(tuple("-" * width for width in widths)))
-    for row in rows:
-        print(format_row(row))
+    print_table(HEADERS, rows)
+
+
+def print_tasks(title: str, tasks: list[Task]) -> None:
+    """Print tasks in the given order, showing each task's own time (-- if it has none)."""
+    print(f"\n{title}")
+    if not tasks:
+        print("(no matching tasks)")
+        return
+    rows = [
+        (
+            f"{task.time:%H:%M}" if task.time else "--:--",
+            "[x]" if task.completed else "[ ]",
+            task.name,
+            task.pet.name if task.pet else "-",
+            task.priority.name,
+        )
+        for task in tasks
+    ]
+    print_table(TASK_HEADERS, rows)
 
 
 def main() -> None:
@@ -45,13 +70,35 @@ def main() -> None:
     owner.add_pet(mochi)
     owner.add_pet(luna)
 
-    # Added out of priority order on purpose, so the scheduler's sorting is visible.
+    # Added out of time and priority order on purpose, so the sorting is visible.
+    # Two tasks share 09:00 (tie broken by priority) and one has no time (sorts last).
+    mochi.add_task(Task("Evening walk", 30, Priority.MEDIUM, time=time(18, 30)))
     mochi.add_task(Task("Grooming", 45, Priority.LOW, Frequency.WEEKLY))
-    mochi.add_task(Task("Morning walk", 30, Priority.HIGH))
-    luna.add_task(Task("Feeding", 10, Priority.MEDIUM))
+    luna.add_task(Task("Play session", 15, Priority.LOW, time=time(9, 0)))
+    mochi.add_task(Task("Morning walk", 30, Priority.HIGH, time=time(7, 30)))
+    luna.add_task(Task("Feeding", 10, Priority.HIGH, time=time(9, 0)))
+    luna.add_task(Task("Litter box", 10, Priority.MEDIUM, time=time(12, 0)))
 
-    schedule = Scheduler(owner).generate_daily_schedule()
-    print_schedule(owner, schedule)
+    # Complete a couple of tasks so the completion filter has something to separate.
+    for task in owner.get_all_tasks():
+        if task.name in ("Morning walk", "Feeding"):
+            task.mark_complete()
+
+    scheduler = Scheduler(owner)
+
+    print_tasks("As added (no sorting)", owner.get_all_tasks())
+    print_tasks("sort_by_time()", scheduler.sort_by_time())
+    print_tasks("filter_tasks(completed=False)", scheduler.filter_tasks(completed=False))
+    print_tasks("filter_tasks(completed=True)", scheduler.filter_tasks(completed=True))
+    print_tasks('filter_tasks(pet_name="luna")', scheduler.filter_tasks(pet_name="luna"))
+    print_tasks(
+        'filter_tasks(completed=False, pet_name="Mochi")',
+        scheduler.filter_tasks(completed=False, pet_name="Mochi"),
+    )
+    print_tasks('filter_tasks(pet_name="Rex")', scheduler.filter_tasks(pet_name="Rex"))
+
+    print()
+    print_schedule(owner, scheduler.generate_daily_schedule())
 
 
 if __name__ == "__main__":
