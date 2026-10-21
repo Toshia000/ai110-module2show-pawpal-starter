@@ -6,6 +6,12 @@ from pawpal_system import Owner, Pet, Priority, Scheduler, Task
 
 DAY_START = time(8, 0)
 
+
+@st.cache_resource
+def get_owner() -> Owner:
+    """Create the Owner once per server process, so it survives reruns and page refreshes."""
+    return Owner("Jordan", "Lee")
+
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
 st.title("🐾 PawPal+")
@@ -45,17 +51,12 @@ At minimum, your system should:
 st.divider()
 
 st.subheader("Owner and Pets")
+owner = get_owner()
 col1, col2 = st.columns(2)
 with col1:
-    first_name = st.text_input("First name", value="Jordan")
+    owner.first_name = st.text_input("First name", value=owner.first_name)
 with col2:
-    last_name = st.text_input("Last name", value="Lee")
-
-# Streamlit reruns this script on every interaction, so keep the Owner in the session.
-if "owner" not in st.session_state:
-    st.session_state.owner = Owner(first_name, last_name)
-owner = st.session_state.owner
-owner.first_name, owner.last_name = first_name, last_name
+    owner.last_name = st.text_input("Last name", value=owner.last_name)
 
 pet_name = st.text_input("Pet name", value="Mochi")
 species = st.selectbox("Species", ["dog", "cat", "other"])
