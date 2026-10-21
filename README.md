@@ -54,6 +54,13 @@ Time         Done  Task          Pet    Priority  Frequency
 08:40-09:25  [ ]   Grooming      Mochi  LOW       weekly
 ```
 
+## Implementation sumary
+
+- Owner can have multiple pets
+- Pets can be of different species and can have multiple tasks
+- Tasks can have different priorities and frequencies
+- Scheduler sorts tasks by priority and generates daily schedules
+
 ## 🧪 Testing PawPal+
 
 ```bash
