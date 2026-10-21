@@ -34,9 +34,12 @@
 - How did you decide which constraints mattered most?
 
 **b. Tradeoffs**
-
+<!-- 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+ -->
+
+- There is an assumption that person does one thing at a time, even when it is possible to feed or walk multiple pets at a time
 
 ---
 
