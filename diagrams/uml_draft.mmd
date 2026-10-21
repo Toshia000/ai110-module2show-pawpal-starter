@@ -4,6 +4,7 @@ classDiagram
         +String lastName
         +List~Pet~ pets
         +addPet(pet Pet) void
+        +getAllTasks() List~Task~
     }
 
     class Pet {
@@ -29,13 +30,13 @@ classDiagram
     }
 
     class Scheduler {
-        +List~Task~ tasks
-        +addTask(task Task) void
+        +Owner owner
         +sortByPriority() List~Task~
         +generateDailySchedule() List~Task~
     }
 
     Owner "1" --> "1..*" Pet : owns
     Pet "1" --> "0..*" Task : has
-    Scheduler "1" o-- "0..*" Task : schedules
+    Scheduler "1" --> "1" Owner : plans for
+    Scheduler ..> Task : orders
     Task --> Priority : has
