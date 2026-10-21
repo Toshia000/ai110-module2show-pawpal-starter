@@ -92,6 +92,21 @@ class Scheduler:
             key=lambda task: (task.time is None, task.time or datetime.time.min, task.priority),
         )
 
+    def filter_tasks(
+        self, completed: bool | None = None, pet_name: str | None = None
+    ) -> list[Task]:
+        """Return the owner's tasks matching every given filter; None skips that filter.
+
+        pet_name is matched case-insensitively against the pet's full name.
+        """
+        wanted_pet = pet_name.strip().casefold() if pet_name is not None else None
+        return [
+            task
+            for task in self.owner.get_all_tasks()
+            if (completed is None or task.completed == completed)
+            and (wanted_pet is None or (task.pet and task.pet.name.casefold() == wanted_pet))
+        ]
+
     def generate_daily_schedule(self) -> list[Task]:
         """Build the day's ordered task list: pending tasks, most important first."""
         return [task for task in self.sort_by_priority() if not task.completed]
